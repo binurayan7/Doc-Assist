@@ -71,4 +71,4 @@ if uploaded_file is not None:
             with st.expander(f"📄 {analysis['name']}"):
                 st.write(f"**Path:** {analysis['path']}")
                 st.write(f"**Extension:** {analysis['extension']}")
-                st.markdown(analysis["documentation"])
+            st.markdown(analysis["documentation"])

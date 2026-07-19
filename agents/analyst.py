@@ -1,60 +1,92 @@
+import json
+
 from services.llm_service import LLMService
 
 
 class AnalyzerAgent:
-    def __init__(self):
-        self.llm_service = LLMService()
+    """
+    Analyzes the entire project and returns a structured
+    understanding of the project.
+    """
 
-    def analyze(self, file_data):
+    def __init__(self):
+        self.llm = LLMService()
+
+    def analyze(self, project):
         """
-        Analyze a single file using Gemini.
+        Analyze the project using Gemini.
 
         Parameters:
-            file_data (dict): Metadata and content of the file.
+            project (dict): Project object from FileService.
 
         Returns:
-            dict: AI-generated analysis.
+            dict: Structured project analysis.
+        """
+
+        prompt = self.build_prompt(project)
+
+        response = self.llm.generate_response(prompt)
+
+        try:
+            return json.loads(response)
+
+        except json.JSONDecodeError:
+            return {
+                "error": "Gemini did not return valid JSON.",
+                "raw_response": response,
+            }
+
+    def build_prompt(self, project):
+        """
+        Build the prompt sent to Gemini.
         """
 
         prompt = f"""
-You are an expert software engineer and technical documentation writer.
+You are an expert software architect.
 
-Analyze the following source code.
+Analyze the following software project.
 
-File Name:
-{file_data["name"]}
+Return ONLY valid JSON.
 
-File Extension:
-{file_data["extension"]}
+Project Name:
+{project["project_name"]}
 
-Source Code:
-{file_data["content"]}
+Project Structure:
+{chr(10).join(project["tree"])}
 
-Generate documentation in the following format:
+Source Files:
 
-Purpose:
-(Explain what this file does.)
-
-Responsibilities:
-(List the main responsibilities.)
-
-Key Components:
-(List important classes, functions, or methods.)
-
-Dependencies:
-(List important libraries or modules used.)
-
-Summary:
-(Give a short overall summary.)
 """
 
-        ai_response = self.llm_service.generate_response(prompt)
+        for file in project["files"]:
+            prompt += f"""
 
-        analysis = {
-            "name": file_data["name"],
-            "path": file_data["path"],
-            "extension": file_data["extension"],
-            "documentation": ai_response,
-        }
+==================================================
+File: {file["path"]}
+==================================================
 
-        return analysis
+{file["content"]}
+
+"""
+
+        prompt += """
+
+Return ONLY JSON in this format:
+
+{
+    "project_name": "",
+    "purpose": "",
+    "summary": "",
+    "architecture": "",
+    "technologies": [],
+    "entry_points": [],
+    "modules": [],
+    "key_components": []
+}
+
+Do not include markdown.
+Do not explain your answer.
+Return only JSON.
+"""
+
+        return prompt
