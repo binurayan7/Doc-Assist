@@ -2,7 +2,6 @@ from pathlib import Path
 
 
 class FileService:
-    # File types we want to read
     SUPPORTED_EXTENSIONS = {
         ".py",
         ".js",
@@ -26,25 +25,41 @@ class FileService:
         ".sh",
     }
 
-    def read_file(self, file_path):
+    def load_project(self, project_path):
 
-        file_path = Path(file_path)
-        # Skip unsupported files
-        if file_path.suffix.lower() not in self.SUPPORTED_EXTENSIONS:
-            return None
+        project_path = Path(project_path)
 
-        try:
-            with open(file_path, "r", encoding="utf-8") as file:
-                return {
-                    "name": file_path.name,
-                    "path": str(file_path),
-                    "extension": file_path.suffix,
-                    "content": file.read(),
-                }
+        project = {
+            "project_name": project_path.name,
+            "root_path": str(project_path),
+            "tree": [],
+            "files": [],
+        }
 
-        except UnicodeDecodeError:
-            return None
+        for item in project_path.rglob("*"):
+            project["tree"].append(str(item))
 
-        except Exception as e:
-            print(f"Error reading {file_path}: {e}")
-            return None
+            if not item.is_file():
+                continue
+
+            if item.suffix.lower() not in self.SUPPORTED_EXTENSIONS:
+                continue
+
+            try:
+                with open(item, "r", encoding="utf-8") as file:
+                    project["files"].append(
+                        {
+                            "name": item.name,
+                            "path": str(item),
+                            "extension": item.suffix,
+                            "content": file.read(),
+                        }
+                    )
+
+            except UnicodeDecodeError:
+                continue
+
+            except Exception as e:
+                print(f"Error reading {item}: {e}")
+
+        return project
