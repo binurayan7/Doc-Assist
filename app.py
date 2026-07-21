@@ -76,7 +76,10 @@ if uploaded_file is not None:
     plan = planner_agent.plan(analysis)
 
     # Generate document
-    documentation = writer_agent.write(analysis, plan)
+    result = writer_agent.write(analysis, plan)
+
+    documentation = result["content"]
+    markdown_path = result["path"]
 
     # Display Analysis
     st.subheader("🤖 Project Analysis")
@@ -110,81 +113,63 @@ if uploaded_file is not None:
 
         st.json(plan)
 
-    # display document
+    # ---------------------------------------------------------
+    # Display Generated Documentation
+    # ---------------------------------------------------------
+
     st.subheader("📄 Generated Documentation")
 
     st.markdown(documentation)
 
     with st.expander("Raw Markdown"):
         st.code(documentation, language="markdown")
+    # ---------------------------------------------------------
+    # Render HTML & PDF
+    # ---------------------------------------------------------
+
+    st.subheader("📑 Rendering Documentation")
+
+    html_path, pdf_path = renderer.render(markdown_path)
+
+    st.success("HTML & PDF generated successfully!")
 
     # ---------------------------------------------------------
-# Display Generated Documentation
-# ---------------------------------------------------------
+    # HTML Preview
+    # ---------------------------------------------------------
 
-st.subheader("📄 Generated Documentation")
+    st.subheader("📖 HTML Preview")
 
-st.markdown(documentation)
+    with open(html_path, "r", encoding="utf-8") as file:
+        html = file.read()
 
-with st.expander("Raw Markdown"):
-    st.code(documentation, language="markdown")
+    st.components.v1.html(
+        html,
+        height=800,
+        scrolling=True,
+    )
 
-# ---------------------------------------------------------
-# Save Markdown
-# ---------------------------------------------------------
+    # ---------------------------------------------------------
+    # Downloads
+    # ---------------------------------------------------------
 
-output_dir = Path("output")
-output_dir.mkdir(exist_ok=True)
+    st.subheader("⬇ Download Files")
 
-markdown_path = output_dir / "documentation.md"
+    col1, col2 = st.columns(2)
 
-markdown_path.write_text(documentation, encoding="utf-8")
+    with col1:
+        with open(markdown_path, "rb") as file:
+            st.download_button(
+                label="Download Markdown",
+                data=file,
+                file_name="documentation.md",
+                mime="text/markdown",
+            )
 
-st.success(f"Markdown saved to {markdown_path}")
-
-# ---------------------------------------------------------
-# Render HTML & PDF
-# ---------------------------------------------------------
-
-st.subheader("📑 Rendering Documentation")
-
-html_path, pdf_path = renderer.render(str(markdown_path))
-
-st.success("HTML & PDF generated successfully!")
-
-# ---------------------------------------------------------
-# HTML Preview
-# ---------------------------------------------------------
-
-st.subheader("📖 HTML Preview")
-
-with open(html_path, "r", encoding="utf-8") as file:
-    html = file.read()
-
-st.components.v1.html(html, height=800, scrolling=True)
-
-# ---------------------------------------------------------
-# Downloads
-# ---------------------------------------------------------
-
-st.subheader("⬇ Download Files")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    with open(markdown_path, "rb") as file:
-        st.download_button(
-            label="Download Markdown",
-            data=file,
-            file_name="documentation.md",
-            mime="text/markdown",
-        )
-
-with col2:
-    with open(pdf_path, "rb") as file:
-        st.download_button(
-            label="Download PDF",
-            data=file,
-            file_name="documentation.pdf",
-            mime="application/pdf",
-        )
+    with col2:
+        with open(pdf_path, "rb") as file:
+            st.download_button(
+                label="Download PDF",
+                data=file,
+                file_name="documentation.pdf",
+                mime="application/pdf",
+            )
