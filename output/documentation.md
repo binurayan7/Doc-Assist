@@ -1,71 +1,81 @@
-# Overleaf Viewer: Technical Documentation & Developer Guide
+# Overleaf Viewer Technical Documentation
 
-## Introduction
-Overleaf Viewer is a utility application designed to solve the challenge of accessing stable PDF URLs for public Overleaf projects. By default, Overleaf does not provide static endpoints for the latest compiled versions of projects. Overleaf Viewer functions as a proxy service, interacting with Overleaf’s internal authentication and compilation workflows to provide users with a stable link that consistently resolves to the most recent version of a project's PDF.
+## 1. Introduction
+Overleaf Viewer is a utility designed to bridge the gap between ephemeral Overleaf share links and stable, programmatic access to compiled PDF documents. Because Overleaf share links often require manual interaction or suffer from expiration/session requirements, this project provides a middleman service that programmatically triggers Overleaf's internal compile workflow.
 
-## Architecture Overview
-The application is built on the **Next.js** framework, leveraging a hybrid architecture of server-side API routes and a client-side interface. 
+By extracting the final PDF URL from an Overleaf public project, the viewer ensures that users receive a permanent, stable URL that consistently serves the latest compiled version of the document. This architecture reduces manual overhead and provides a reliable integration point for automated documentation pipelines.
 
-*   **Client-Side:** A React-based interface built with TailwindCSS allows users to input Overleaf share URLs, parse project tokens, and generate stable links.
-*   **Server-Side:** Next.js API routes act as the backend engine. These routes manage session authentication, trigger Overleaf project compilation, and fetch the resulting PDF files.
-*   **Proxy Logic:** The system mimics user interactions with Overleaf to perform the necessary background tasks required to retrieve an up-to-date PDF, bridging the gap between Overleaf’s dynamic interface and a static URL output.
+## 2. System Architecture
+The application is built using a serverless-compatible Next.js architecture leveraging the App Router. The design separates concerns into two distinct layers:
 
-## Setup and Installation
+*   **Client-Side UI:** A React-based interface responsible for accepting user input (Overleaf share URLs) and generating unique viewer tokens.
+*   **Server-Side Orchestration:** API routes that manage the lifecycle of an Overleaf project interaction. This includes handling CSRF tokens, session authentication, triggering remote compilation, and managing the resulting PDF lifecycle.
 
+**Data Flow:**
+1. User provides a Share URL to the **Frontend UI**.
+2. The UI generates a unique token and links to the **PDF Viewer Page**.
+3. The **API Route Handler** interceptor processes the token, performing scraping/API calls to Overleaf.
+4. **NodeCache** stores session identifiers and final PDF URLs to reduce redundant load on Overleaf servers.
+
+## 3. Getting Started
 ### Prerequisites
-*   Node.js (LTS version recommended)
-*   npm or yarn package manager
+* Node.js 18.x or higher
+* npm or yarn
+* An active Vercel account (for deployment)
 
-### Configuration
-1.  Clone the repository to your local machine.
-2.  Install dependencies:
-    ```bash
-    npm install
-    ```
-3.  Configure environment variables as required by the Overleaf authentication proxy logic.
-4.  Run the development server:
-    ```bash
-    npm run dev
-    ```
-5.  Access the application at `http://localhost:3000`.
+### Local Setup
+1. Clone the repository: `git clone [repository-url]`
+2. Install dependencies: `npm install`
+3. Configure environment variables (if required for API headers).
+4. Run the development server: `npm run dev`
 
-## Core Components
+### Deployment
+The project is optimized for the Vercel platform. Push your code to a linked GitHub repository, and Vercel will automatically trigger the build process for the Next.js App Router structure. Ensure `Vercel Analytics` is enabled in your dashboard for usage tracking.
 
-### Frontend UI (`app/page.tsx`)
-The primary entry point for users. It provides a clean, TailwindCSS-styled interface where users submit an Overleaf share URL. The UI parses the URL to extract the unique project token and facilitates the generation and copying of the resulting stable link.
+## 4. Core Modules & Components
+### API Route Handler (`app/api/overleaf/[token]/route.js`)
+This is the heart of the application. It orchestrates the sequence of operations required to interact with Overleaf:
+* **CSRF Handling:** Extracting and passing mandatory security tokens.
+* **Authentication/Access:** Negotiating access to the public project.
+* **Compilation Workflow:** Triggering the remote build process.
+* **Extraction:** Parsing the response to obtain the direct PDF stream/URL.
 
-### PDF Viewer (`app/view/[token]/page.js`)
-This component is responsible for the presentation layer of the compiled document. It takes the project token and renders the finalized PDF within an iframe, providing a seamless viewing and download experience for the end user.
+### NodeCache Service (`lib/utils.js`)
+An in-memory caching layer that mitigates the risk of rate-limiting by Overleaf. It stores:
+* Active CSRF tokens and cookies.
+* Project-specific identifiers.
+* The resolved final PDF URL (with a TTL to ensure "latest" versioning).
 
-### Overleaf Handler (`app/api/overleaf/[token]/route.js`)
-The core integration module. This route contains the logic for:
-*   Interfacing with Overleaf’s backend.
-*   Handling session authentication (including CSRF and cookies).
-*   Triggering remote project compilation.
-*   Returning the finalized PDF link to the client.
+### PDF Viewer Page (`app/view/[token]/page.js`)
+A lightweight wrapper that embeds the resolved PDF URL within an `iframe`. It acts as the permanent endpoint for users.
 
-## Caching Strategy
-To optimize performance and reduce the load on both the Overleaf platform and the application server, the project utilizes **NodeCache**. 
+## 5. API Reference
+### `GET /api/overleaf/[token]`
+This endpoint retrieves the compiled PDF link for a given project.
 
-*   **Session Metadata:** Authentication cookies and CSRF tokens are cached to prevent redundant handshake requests.
-*   **PDF Delivery:** Finalized PDF links are stored in an in-memory cache to ensure that repeat requests for the same project receive rapid responses without re-triggering the compilation workflow.
+* **Parameters:** `token` (The unique identifier generated during project submission).
+* **Request Sequence:**
+  1. Check `NodeCache` for existing valid PDF link.
+  2. If missing, initiate the Overleaf handshake (Cookie + CSRF).
+  3. Execute `lib/process.js` logic to trigger compilation.
+  4. Parse the project state until the PDF resource is available.
+* **Response:** A redirect or embedded stream of the compiled PDF.
 
-## API Reference
+## 6. Development Guide
+### Handling Web Structure Changes
+Overleaf is a dynamic platform. If the internal API structure changes (e.g., HTML class names for the "Compile" button or header structures), update the scraping logic located in `lib/process.js`.
 
-### `GET /api/overleaf/[token]/`
-Handles the request for a specific project's PDF.
+### Extending the Cache
+The `NodeCache` implementation should be monitored for memory usage. If the deployment scales significantly, consider moving the cache to an external store like Redis, maintaining the current `lib/utils.js` interface to minimize code changes.
 
-*   **Parameters:**
-    *   `token` (string): The unique identifier parsed from an Overleaf share URL.
-*   **Behavior:** 
-    *   Checks the `NodeCache` for existing valid links or session data.
-    *   If unavailable, initiates the handshake and compilation process via the Overleaf internal workflow.
-    *   Returns the stable PDF link.
-*   **Error Handling:** Returns standard HTTP error codes (e.g., 404 for invalid tokens, 500 for compilation failures) with descriptive messages to assist in debugging.
+### Best Practices
+* Always utilize `Axios` interceptors for consistent header management across scraping requests.
+* Ensure all error states from Overleaf (e.g., compile errors) are caught and surfaced to the UI rather than failing silently.
 
-## Contribution Guidelines
-We welcome contributions to improve the reliability and functionality of Overleaf Viewer.
+## 7. Deployment & Maintenance
+### Troubleshooting
+* **Compilation Errors:** If the PDF fails to load, check the logs for "Compile Timeout" or "Access Denied." These often stem from changes in Overleaf’s authentication headers.
+* **Rate Limiting:** If experiencing frequent 429 errors, increase the TTL settings in `NodeCache`.
 
-*   **Coding Standards:** The project is written in **TypeScript**. Please ensure all new code maintains strict type safety.
-*   **Linting:** The project uses **ESLint** to enforce code quality. Run `npm run lint` before submitting a pull request to ensure adherence to project standards.
-*   **Submission:** Submit all changes via Pull Requests on the repository, ensuring that your code is documented and tested against the existing API logic.
+### Monitoring
+Use the **Vercel Analytics** dashboard to monitor traffic patterns and ensure that API route executions are within the expected duration limits for serverless functions.

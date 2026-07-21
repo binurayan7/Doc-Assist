@@ -8,6 +8,7 @@ from agents.analyst import AnalyzerAgent
 from agents.planner import PlannerAgent
 from agents.writer import WriterAgent
 from renderer.renderer_service import RendererService
+from agents.editor import EditorAgent
 
 st.set_page_config(
     page_title="GenAI Documentation Assistant",
@@ -32,6 +33,7 @@ if uploaded_file is not None:
     planner_agent = PlannerAgent()
     writer_agent = WriterAgent()
     renderer = RendererService()
+    editor_agent = EditorAgent()
     # Save uploaded ZIP
     saved_path = zip_service.save_uploaded_file(uploaded_file)
 
@@ -173,3 +175,13 @@ if uploaded_file is not None:
                 file_name="documentation.pdf",
                 mime="application/pdf",
             )
+
+    st.subheader("✏ AI Editor")
+
+    instruction = st.text_input(
+        "Enter an editing instruction",
+        placeholder="Example: Rename the title to Smart Library System",
+    )
+
+    if st.button("Apply Changes"):
+        updated_markdown = EditorAgent.edit(documentation, instruction)
