@@ -1,4 +1,5 @@
 from services.llm_service import LLMService
+from pathlib import Path
 
 
 class WriterAgent:
@@ -24,7 +25,18 @@ class WriterAgent:
 
         prompt = self.build_prompt(analysis, plan)
 
-        return self.llm.generate_response(prompt)
+        documentation = self.llm.generate_response(prompt)
+
+        # Create output directory if it doesn't exist
+        output_dir = Path("output")
+        output_dir.mkdir(exist_ok=True)
+
+        # Save markdown
+        markdown_path = output_dir / "documentation.md"
+
+        markdown_path.write_text(documentation, encoding="utf-8")
+
+        return {"content": documentation, "path": str(markdown_path)}
 
     def build_prompt(self, analysis, plan):
         """

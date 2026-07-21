@@ -1,4 +1,5 @@
 import streamlit as st
+from pathlib import Path
 
 from services.zip_service import ZipService
 from services.tree_service import TreeService
@@ -6,6 +7,7 @@ from services.file_service import FileService
 from agents.analyst import AnalyzerAgent
 from agents.planner import PlannerAgent
 from agents.writer import WriterAgent
+from renderer.renderer_service import RendererService
 
 st.set_page_config(
     page_title="GenAI Documentation Assistant",
@@ -29,6 +31,7 @@ if uploaded_file is not None:
     analyzer_agent = AnalyzerAgent()
     planner_agent = PlannerAgent()
     writer_agent = WriterAgent()
+    renderer = RendererService()
     # Save uploaded ZIP
     saved_path = zip_service.save_uploaded_file(uploaded_file)
 
@@ -114,3 +117,74 @@ if uploaded_file is not None:
 
     with st.expander("Raw Markdown"):
         st.code(documentation, language="markdown")
+
+    # ---------------------------------------------------------
+# Display Generated Documentation
+# ---------------------------------------------------------
+
+st.subheader("📄 Generated Documentation")
+
+st.markdown(documentation)
+
+with st.expander("Raw Markdown"):
+    st.code(documentation, language="markdown")
+
+# ---------------------------------------------------------
+# Save Markdown
+# ---------------------------------------------------------
+
+output_dir = Path("output")
+output_dir.mkdir(exist_ok=True)
+
+markdown_path = output_dir / "documentation.md"
+
+markdown_path.write_text(documentation, encoding="utf-8")
+
+st.success(f"Markdown saved to {markdown_path}")
+
+# ---------------------------------------------------------
+# Render HTML & PDF
+# ---------------------------------------------------------
+
+st.subheader("📑 Rendering Documentation")
+
+html_path, pdf_path = renderer.render(str(markdown_path))
+
+st.success("HTML & PDF generated successfully!")
+
+# ---------------------------------------------------------
+# HTML Preview
+# ---------------------------------------------------------
+
+st.subheader("📖 HTML Preview")
+
+with open(html_path, "r", encoding="utf-8") as file:
+    html = file.read()
+
+st.components.v1.html(html, height=800, scrolling=True)
+
+# ---------------------------------------------------------
+# Downloads
+# ---------------------------------------------------------
+
+st.subheader("⬇ Download Files")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    with open(markdown_path, "rb") as file:
+        st.download_button(
+            label="Download Markdown",
+            data=file,
+            file_name="documentation.md",
+            mime="text/markdown",
+        )
+
+with col2:
+    with open(pdf_path, "rb") as file:
+        st.download_button(
+            label="Download PDF",
+            data=file,
+            file_name="documentation.pdf",
+            mime="application/pdf",
+        )
