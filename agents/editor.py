@@ -3,16 +3,30 @@ from services.llm_service import LLMService
 
 class EditorAgent:
     def __init__(self):
+        print("\n[EditorAgent] Initializing EditorAgent")
         self.llm = LLMService()
 
     def edit(self, markdown: str, instruction: str) -> str:
-        """
-        Edit an existing Markdown document based on a natural language instruction.
-        """
+        print("\n" + "=" * 80)
+        print("[EditorAgent] edit() ENTERED")
+        print(f"[EditorAgent] Instruction: {instruction}")
+        print(f"[EditorAgent] Markdown length: {len(markdown)}")
 
         prompt = self.build_prompt(markdown, instruction)
 
+        print("[EditorAgent] Prompt built")
+        print("[EditorAgent] Sending request to LLM...")
+
         updated_markdown = self.llm.generate_response(prompt)
+
+        print("[EditorAgent] Response received from LLM")
+
+        if updated_markdown is None:
+            print("[EditorAgent] ERROR: LLM returned None")
+            return markdown
+
+        print(f"[EditorAgent] Updated markdown length: {len(updated_markdown)}")
+        print("=" * 80)
 
         return updated_markdown
 
@@ -20,6 +34,8 @@ class EditorAgent:
         """
         Build the editing prompt sent to Gemini.
         """
+
+        print("[EditorAgent] Building editing prompt...")
 
         prompt = f"""
 You are an expert technical documentation editor.
@@ -53,5 +69,7 @@ USER REQUEST
 
 {instruction}
 """
+
+        print("[EditorAgent] Prompt construction completed")
 
         return prompt
